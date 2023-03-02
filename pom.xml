@@ -13,7 +13,8 @@
     <url>https://www.bakhromjonov.com</url>
 
     <modules>
-        <module>customer/customer</module>
+        <module>customer</module>
+        <module>fraud</module>
     </modules>
 
     <properties>
