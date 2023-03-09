@@ -1,12 +1,14 @@
 package com.bakhromjonov.customer.service;
 
+import com.bakhromjonov.amqp.RabbitMQMessageProducer;
+import com.bakhromjonov.clients.fraud.FraudCheckResponse;
+import com.bakhromjonov.clients.fraud.FraudClient;
+import com.bakhromjonov.clients.notification.NotificationRequest;
 import com.bakhromjonov.customer.model.Customer;
 import com.bakhromjonov.customer.payload.CustomerRegistrationRequest;
-import com.bakhromjonov.customer.payload.FraudCheckResponse;
 import com.bakhromjonov.customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.Objects;
 
@@ -15,7 +17,8 @@ import java.util.Objects;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final RestTemplate restTemplate;
+    private final FraudClient fraudClient;
+    private final RabbitMQMessageProducer rabbitMQMessageProducer;
 
     public void registerCustomer(CustomerRegistrationRequest request) {
         Customer customer = Customer.builder()
@@ -26,13 +29,20 @@ public class CustomerService {
 
         customerRepository.saveAndFlush(customer);
 
-        FraudCheckResponse fraudCheckResponse = restTemplate.getForObject(
-                "http://FRAUD/api/v1/fraud-check/{customerId}",
-                FraudCheckResponse.class,
-                customer.getId()
-        );
+        FraudCheckResponse fraudCheckResponse = fraudClient.isFraudster(customer.getId());
 
         if (Objects.requireNonNull(fraudCheckResponse).isFraudster())
             throw new IllegalStateException("fraudster");
+
+        NotificationRequest notificationRequest = new NotificationRequest(
+                customer.getId(),
+                customer.getEmail(),
+                String.format("Hi %s, welcome to Bakhromjonov's...", customer.getFirstName())
+        );
+
+        rabbitMQMessageProducer.publish(
+                notificationRequest,
+                "internal.exchange",
+                "internal.notification.routing-key");
     }
 }
