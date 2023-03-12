@@ -107,6 +107,7 @@ services:
 #      - zipkin
 #      - postgres
 #      - rabbitmq
+
 networks:
   postgres:
     driver: bridge
